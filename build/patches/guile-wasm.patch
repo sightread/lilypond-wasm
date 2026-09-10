@@ -1,0 +1,819 @@
+The changes Guile needs to run under WebAssembly, in three groups.
+
+Indirect-call signatures: wasm verifies the type of every call through a function pointer,
+where a native target just jumps. Guile casts void(void) subr initializers and two-argument
+hash callbacks into other pointer types, and each of those traps here. Each one is given a
+wrapper with the signature the call site declares.
+
+Word size: the compiler bakes in the host's pointer size when it cross-compiles Scheme to
+bytecode, so a build machine with 64-bit pointers emits code that a 32-bit wasm target cannot
+load. Read the target word size at run time instead.
+
+Threads and locales: no pthreads and no locale support in this build, so the pieces that assume
+either are compiled out.
+--- a/libguile/atomic.c	2019-08-26 12:41:29
++++ b/libguile/atomic.c	2026-09-05 10:35:05
+@@ -124,11 +124,19 @@
+ #include "atomic.x"
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_atomic_ext (void *unused)
++{
++  scm_init_atomic ();
++}
++
+ void
+ scm_register_atomic (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_atomic",
+-			    (scm_t_extension_init_func) scm_init_atomic,
++			    scm_init_atomic_ext,
+ 			    NULL);
+ }
+
+--- a/libguile/bytevectors.c	2025-11-11 13:56:38
++++ b/libguile/bytevectors.c	2026-09-05 10:35:05
+@@ -2283,6 +2283,14 @@
+ 
+ /* Initialization.  */
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_bytevectors_ext (void *unused)
++{
++  scm_init_bytevectors ();
++}
++
+ void
+ scm_bootstrap_bytevectors (void)
+ {
+@@ -2303,7 +2311,7 @@
+ 
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_bytevectors",
+-			    (scm_t_extension_init_func) scm_init_bytevectors,
++			    scm_init_bytevectors_ext,
+ 			    NULL);
+ 
+   scm_i_register_vector_constructor
+
+--- a/libguile/custom-ports.c	2023-06-10 01:46:34
++++ b/libguile/custom-ports.c	2026-09-05 10:35:05
+@@ -195,11 +195,19 @@
+ #include "custom-ports.x"
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_custom_ports_ext (void *unused)
++{
++  scm_init_custom_ports ();
++}
++
+ void
+ scm_register_custom_ports (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_custom_ports",
+-                            (scm_t_extension_init_func) scm_init_custom_ports,
++                            scm_init_custom_ports_ext,
+                             NULL);
+ }
+
+--- a/libguile/fdes-finalizers.c	2019-08-26 12:41:29
++++ b/libguile/fdes-finalizers.c	2026-09-05 10:35:05
+@@ -127,6 +127,14 @@
+ #include "fdes-finalizers.x"
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_fdes_finalizers_ext (void *unused)
++{
++  scm_init_fdes_finalizers ();
++}
++
+ void
+ scm_register_fdes_finalizers ()
+ {
+@@ -134,6 +142,6 @@
+ 
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_fdes_finalizers",
+-                            (scm_t_extension_init_func) scm_init_fdes_finalizers,
++                            scm_init_fdes_finalizers_ext,
+                             NULL);
+ }
+
+--- a/libguile/foreign-object.c	2019-08-26 12:41:29
++++ b/libguile/foreign-object.c	2026-09-05 10:35:05
+@@ -222,11 +222,19 @@
+                       (scm_t_subr) sys_add_finalizer_x);
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_foreign_object_ext (void *unused)
++{
++  scm_init_foreign_object ();
++}
++
+ void
+ scm_register_foreign_object (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_foreign_object",
+-                            (scm_t_extension_init_func)scm_init_foreign_object,
++                            scm_init_foreign_object_ext,
+                             NULL);
+ }
+
+--- a/libguile/foreign.c	2024-04-15 21:58:25
++++ b/libguile/foreign.c	2026-09-05 10:35:05
+@@ -1386,12 +1386,20 @@
+   scm_define (sym_null, null_pointer);
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_foreign_ext (void *unused)
++{
++  scm_init_foreign ();
++}
++
+ void
+ scm_register_foreign (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_foreign",
+-                            (scm_t_extension_init_func)scm_init_foreign,
++                            scm_init_foreign_ext,
+                             NULL);
+   pointer_weak_refs = scm_c_make_weak_table (0, SCM_WEAK_TABLE_KIND_KEY);
+ }
+
+--- a/libguile/fports.c	2025-04-10 11:46:31
++++ b/libguile/fports.c	2026-09-05 10:35:05
+@@ -775,6 +775,14 @@
+ #include "fports.x"
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_ice_9_fports_ext (void *unused)
++{
++  scm_init_ice_9_fports ();
++}
++
+ void
+ scm_init_fports ()
+ {
+@@ -782,7 +790,7 @@
+ 
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_ice_9_fports",
+-			    (scm_t_extension_init_func) scm_init_ice_9_fports,
++			    scm_init_ice_9_fports_ext,
+ 			    NULL);
+ 
+   /* The following bindings are used early in boot-9.scm.  */
+
+--- a/libguile/hashtab.c	2018-09-23 00:51:40
++++ b/libguile/hashtab.c	2026-09-05 10:33:39
+@@ -378,6 +378,41 @@
+ 
+ 
+ 
++
++/* WebAssembly checks the signature of every indirect call, so the two-argument
++   hash and assoc primitives cannot be passed off as the three-argument
++   callbacks the generic table functions take.  */
++static unsigned long
++ihashq_fn (SCM obj, unsigned long n, void *closure)
++{
++  return scm_ihashq (obj, n);
++}
++static unsigned long
++ihashv_fn (SCM obj, unsigned long n, void *closure)
++{
++  return scm_ihashv (obj, n);
++}
++static unsigned long
++ihash_fn (SCM obj, unsigned long n, void *closure)
++{
++  return scm_ihash (obj, n);
++}
++static SCM
++sloppy_assq_fn (SCM key, SCM alist, void *closure)
++{
++  return scm_sloppy_assq (key, alist);
++}
++static SCM
++sloppy_assv_fn (SCM key, SCM alist, void *closure)
++{
++  return scm_sloppy_assv (key, alist);
++}
++static SCM
++sloppy_assoc_fn (SCM key, SCM alist, void *closure)
++{
++  return scm_sloppy_assoc (key, alist);
++}
++
+ SCM_DEFINE (scm_hashq_get_handle, "hashq-get-handle", 2, 0, 0,
+             (SCM table, SCM key),
+ 	    "This procedure returns the @code{(key . value)} pair from the\n"
+@@ -387,8 +422,8 @@
+ #define FUNC_NAME s_scm_hashq_get_handle
+ {
+   return scm_hash_fn_get_handle (table, key,
+-				 (scm_t_hash_fn) scm_ihashq,
+-				 (scm_t_assoc_fn) scm_sloppy_assq,
++				 ihashq_fn,
++				 sloppy_assq_fn,
+ 				 0);
+ }
+ #undef FUNC_NAME
+@@ -402,8 +437,8 @@
+ #define FUNC_NAME s_scm_hashq_create_handle_x
+ {
+   return scm_hash_fn_create_handle_x (table, key, init,
+-				      (scm_t_hash_fn) scm_ihashq,
+-				      (scm_t_assoc_fn) scm_sloppy_assq,
++				      ihashq_fn,
++				      sloppy_assq_fn,
+ 				      0);
+ }
+ #undef FUNC_NAME
+@@ -424,8 +459,8 @@
+     return scm_weak_table_refq (table, key, dflt);
+ 
+   return scm_hash_fn_ref (table, key, dflt,
+-			  (scm_t_hash_fn) scm_ihashq,
+-			  (scm_t_assoc_fn) scm_sloppy_assq,
++			  ihashq_fn,
++			  sloppy_assq_fn,
+ 			  0);
+ }
+ #undef FUNC_NAME
+@@ -445,8 +480,8 @@
+     }
+ 
+   return scm_hash_fn_set_x (table, key, val,
+-			    (scm_t_hash_fn) scm_ihashq,
+-			    (scm_t_assoc_fn) scm_sloppy_assq,
++			    ihashq_fn,
++			    sloppy_assq_fn,
+ 			    0);
+ }
+ #undef FUNC_NAME
+@@ -470,8 +505,8 @@
+     }
+ 
+   return scm_hash_fn_remove_x (table, key,
+-			       (scm_t_hash_fn) scm_ihashq,
+-			       (scm_t_assoc_fn) scm_sloppy_assq,
++			       ihashq_fn,
++			       sloppy_assq_fn,
+ 			       0);
+ }
+ #undef FUNC_NAME
+@@ -488,8 +523,8 @@
+ #define FUNC_NAME s_scm_hashv_get_handle
+ {
+   return scm_hash_fn_get_handle (table, key,
+-				 (scm_t_hash_fn) scm_ihashv,
+-				 (scm_t_assoc_fn) scm_sloppy_assv,
++				 ihashv_fn,
++				 sloppy_assv_fn,
+ 				 0);
+ }
+ #undef FUNC_NAME
+@@ -503,8 +538,8 @@
+ #define FUNC_NAME s_scm_hashv_create_handle_x
+ {
+   return scm_hash_fn_create_handle_x (table, key, init,
+-				      (scm_t_hash_fn) scm_ihashv,
+-				      (scm_t_assoc_fn) scm_sloppy_assv,
++				      ihashv_fn,
++				      sloppy_assv_fn,
+ 				      0);
+ }
+ #undef FUNC_NAME
+@@ -533,8 +568,8 @@
+                                  (void *) SCM_UNPACK (key), dflt);
+ 
+   return scm_hash_fn_ref (table, key, dflt,
+-			  (scm_t_hash_fn) scm_ihashv,
+-			  (scm_t_assoc_fn) scm_sloppy_assv,
++			  ihashv_fn,
++			  sloppy_assv_fn,
+ 			  0);
+ }
+ #undef FUNC_NAME
+@@ -556,8 +591,8 @@
+     }
+ 
+   return scm_hash_fn_set_x (table, key, val,
+-			    (scm_t_hash_fn) scm_ihashv,
+-			    (scm_t_assoc_fn) scm_sloppy_assv,
++			    ihashv_fn,
++			    sloppy_assv_fn,
+ 			    0);
+ }
+ #undef FUNC_NAME
+@@ -578,8 +613,8 @@
+     }
+ 
+   return scm_hash_fn_remove_x (table, key,
+-			       (scm_t_hash_fn) scm_ihashv,
+-			       (scm_t_assoc_fn) scm_sloppy_assv,
++			       ihashv_fn,
++			       sloppy_assv_fn,
+ 			       0);
+ }
+ #undef FUNC_NAME
+@@ -595,8 +630,8 @@
+ #define FUNC_NAME s_scm_hash_get_handle
+ {
+   return scm_hash_fn_get_handle (table, key,
+-				 (scm_t_hash_fn) scm_ihash,
+-				 (scm_t_assoc_fn) scm_sloppy_assoc,
++				 ihash_fn,
++				 sloppy_assoc_fn,
+ 				 0);
+ }
+ #undef FUNC_NAME
+@@ -610,8 +645,8 @@
+ #define FUNC_NAME s_scm_hash_create_handle_x
+ {
+   return scm_hash_fn_create_handle_x (table, key, init,
+-				      (scm_t_hash_fn) scm_ihash,
+-				      (scm_t_assoc_fn) scm_sloppy_assoc,
++				      ihash_fn,
++				      sloppy_assoc_fn,
+ 				      0);
+ }
+ #undef FUNC_NAME
+@@ -640,8 +675,8 @@
+                                  (void *) SCM_UNPACK (key), dflt);
+ 
+   return scm_hash_fn_ref (table, key, dflt,
+-			  (scm_t_hash_fn) scm_ihash,
+-			  (scm_t_assoc_fn) scm_sloppy_assoc,
++			  ihash_fn,
++			  sloppy_assoc_fn,
+ 			  0);
+ }
+ #undef FUNC_NAME
+@@ -664,8 +699,8 @@
+     }
+ 
+   return scm_hash_fn_set_x (table, key, val,
+-			    (scm_t_hash_fn) scm_ihash,
+-			    (scm_t_assoc_fn) scm_sloppy_assoc,
++			    ihash_fn,
++			    sloppy_assoc_fn,
+ 			    0);
+ }
+ #undef FUNC_NAME
+@@ -687,8 +722,8 @@
+     }
+ 
+   return scm_hash_fn_remove_x (table, key,
+-			       (scm_t_hash_fn) scm_ihash,
+-			       (scm_t_assoc_fn) scm_sloppy_assoc,
++			       ihash_fn,
++			       sloppy_assoc_fn,
+ 			       0);
+ }
+ #undef FUNC_NAME
+
+--- a/libguile/i18n.c	2022-10-21 19:39:38
++++ b/libguile/i18n.c	2026-09-05 10:35:18
+@@ -1885,12 +1885,20 @@
+   SCM_VARIABLE_SET (scm_global_locale, global_locale_smob);
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_i18n_ext (void *unused)
++{
++  scm_init_i18n ();
++}
++
+ void
+ scm_bootstrap_i18n ()
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_i18n",
+-			    (scm_t_extension_init_func) scm_init_i18n,
++			    scm_init_i18n_ext,
+ 			    NULL);
+ 
+ }
+
+--- a/libguile/instructions.c	2020-08-24 17:19:14
++++ b/libguile/instructions.c	2026-09-05 10:35:18
+@@ -193,12 +193,20 @@
+ }
+ #undef FUNC_NAME
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_instructions_ext (void *unused)
++{
++  scm_init_instructions ();
++}
++
+ void
+ scm_bootstrap_instructions (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_instructions",
+-                            (scm_t_extension_init_func)scm_init_instructions,
++                            scm_init_instructions_ext,
+                             NULL);
+ }
+ 
+
+--- a/libguile/intrinsics.c	2023-12-28 15:24:02
++++ b/libguile/intrinsics.c	2026-09-05 10:35:18
+@@ -582,6 +582,14 @@
+ #define INT64_INTRINSIC(name) name
+ #endif
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_intrinsics_ext (void *unused)
++{
++  scm_init_intrinsics ();
++}
++
+ void
+ scm_bootstrap_intrinsics (void)
+ {
+@@ -694,7 +702,7 @@
+ 
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_intrinsics",
+-                            (scm_t_extension_init_func)scm_init_intrinsics,
++                            scm_init_intrinsics_ext,
+                             NULL);
+ }
+ 
+
+--- a/libguile/ioext.c	2024-05-06 13:51:53
++++ b/libguile/ioext.c	2026-09-05 10:35:18
+@@ -318,6 +318,14 @@
+ #include "ioext.x"
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_ice_9_ioext_ext (void *unused)
++{
++  scm_init_ice_9_ioext ();
++}
++
+ void 
+ scm_init_ioext ()
+ {
+@@ -325,7 +333,7 @@
+ 
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_ice_9_ioext",
+-			    (scm_t_extension_init_func) scm_init_ice_9_ioext,
++			    scm_init_ice_9_ioext_ext,
+ 			    NULL);
+ }
+ 
+
+--- a/libguile/loader.c	2025-04-10 11:46:31
++++ b/libguile/loader.c	2026-09-05 10:35:18
+@@ -822,6 +822,14 @@
+ }
+ 
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_loader_ext (void *unused)
++{
++  scm_init_loader ();
++}
++
+ void
+ scm_bootstrap_loader (void)
+ {
+@@ -836,7 +844,7 @@
+ 
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_loader",
+-                            (scm_t_extension_init_func)scm_init_loader, NULL);
++                            scm_init_loader_ext, NULL);
+ }
+ 
+ void
+
+--- a/libguile/poll.c	2019-08-26 12:41:29
++++ b/libguile/poll.c	2026-09-05 10:35:18
+@@ -219,11 +219,19 @@
+ 
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_poll_ext (void *unused)
++{
++  scm_init_poll ();
++}
++
+ void
+ scm_register_poll (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_poll",
+-			    (scm_t_extension_init_func) scm_init_poll,
++			    scm_init_poll_ext,
+ 			    NULL);
+ }
+
+--- a/libguile/ports.c	2025-11-11 13:58:07
++++ b/libguile/ports.c	2026-09-05 10:35:18
+@@ -4189,6 +4189,14 @@
+   scm_c_define ("%current-warning-port-fluid", cur_warnport_fluid);
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_ice_9_ports_ext (void *unused)
++{
++  scm_init_ice_9_ports ();
++}
++
+ void
+ scm_init_ports (void)
+ {
+@@ -4234,7 +4242,7 @@
+ 
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_ice_9_ports",
+-			    (scm_t_extension_init_func) scm_init_ice_9_ports,
++			    scm_init_ice_9_ports_ext,
+ 			    NULL);
+ 
+   /* The following bindings are used early in boot-9.scm.  */
+
+--- a/libguile/posix.c	2025-11-11 13:56:38
++++ b/libguile/posix.c	2026-09-05 10:35:18
+@@ -2595,6 +2595,14 @@
+ }
+ 
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_popen_ext (void *unused)
++{
++  scm_init_popen ();
++}
++
+ void
+ scm_init_posix ()
+ {
+@@ -2715,6 +2723,6 @@
+   scm_add_feature ("popen");
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_popen",
+-			    (scm_t_extension_init_func) scm_init_popen,
++			    scm_init_popen_ext,
+ 			    NULL);
+ }
+
+--- a/libguile/programs.c	2019-08-26 12:41:29
++++ b/libguile/programs.c	2026-09-05 10:35:18
+@@ -375,12 +375,20 @@
+ 
+ 
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_programs_ext (void *unused)
++{
++  scm_init_programs ();
++}
++
+ void
+ scm_bootstrap_programs (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_programs",
+-                            (scm_t_extension_init_func)scm_init_programs, NULL);
++                            scm_init_programs_ext, NULL);
+ }
+ 
+ void
+
+--- a/libguile/r6rs-ports.c	2024-06-16 16:47:58
++++ b/libguile/r6rs-ports.c	2026-09-05 10:35:18
+@@ -909,12 +909,20 @@
+ 
+ /* Initialization.  */
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_r6rs_ports_ext (void *unused)
++{
++  scm_init_r6rs_ports ();
++}
++
+ void
+ scm_register_r6rs_ports (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_r6rs_ports",
+-			    (scm_t_extension_init_func) scm_init_r6rs_ports,
++			    scm_init_r6rs_ports_ext,
+ 			    NULL);
+ 
+   initialize_bytevector_input_ports ();
+
+--- a/libguile/srfi-4.c	2022-01-10 20:58:37
++++ b/libguile/srfi-4.c	2026-09-05 10:35:18
+@@ -291,6 +291,14 @@
+ 
+ /* Initialization.  */
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_srfi_4_ext (void *unused)
++{
++  scm_init_srfi_4 ();
++}
++
+ void
+ scm_bootstrap_srfi_4 (void)
+ {
+@@ -314,7 +322,7 @@
+ 
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_srfi_4",
+-			    (scm_t_extension_init_func) scm_init_srfi_4,
++			    scm_init_srfi_4_ext,
+ 			    NULL);
+ }
+ 
+
+--- a/libguile/srfi-60.c	2022-01-25 02:16:03
++++ b/libguile/srfi-60.c	2026-09-05 10:35:18
+@@ -403,12 +403,20 @@
+ SCM_REGISTER_PROC (s_srfi60_booleans_to_integer, "booleans->integer", 0, 0, 1, scm_srfi60_list_to_integer);
+ 
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_srfi_60_ext (void *unused)
++{
++  scm_init_srfi_60 ();
++}
++
+ void
+ scm_register_srfi_60 (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_srfi_60",
+-                            (scm_t_extension_init_func)scm_init_srfi_60, NULL);
++                            scm_init_srfi_60_ext, NULL);
+ }
+ 
+ void
+
+--- a/libguile/unicode.c	2019-08-26 12:41:29
++++ b/libguile/unicode.c	2026-09-05 10:35:18
+@@ -87,11 +87,19 @@
+ #endif
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_load_unicode_ext (void *unused)
++{
++  scm_load_unicode ();
++}
++
+ void
+ scm_init_unicode (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_unicode",
+-                            (scm_t_extension_init_func)scm_load_unicode,
++                            scm_load_unicode_ext,
+                             NULL);
+ }
+
+--- a/libguile/vm.c	2025-04-10 11:46:31
++++ b/libguile/vm.c	2026-09-05 10:35:18
+@@ -1925,15 +1925,29 @@
+ #undef INIT_BUILTIN
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_vm_ext (void *unused)
++{
++  scm_init_vm ();
++}
++
++static void
++scm_init_vm_builtins_ext (void *unused)
++{
++  scm_init_vm_builtins ();
++}
++
+ void
+ scm_bootstrap_vm (void)
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_vm",
+-                            (scm_t_extension_init_func)scm_init_vm, NULL);
++                            scm_init_vm_ext, NULL);
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_vm_builtins",
+-                            (scm_t_extension_init_func)scm_init_vm_builtins,
++                            scm_init_vm_builtins_ext,
+                             NULL);
+ 
+   scm_vm_intrinsics.expand_stack = thread_expand_stack;
+
+--- a/libguile/weak-vector.c	2019-08-26 12:41:29
++++ b/libguile/weak-vector.c	2026-09-05 10:35:18
+@@ -261,12 +261,20 @@
+ #endif
+ }
+ 
++/* WebAssembly checks indirect-call signatures: a void(void) initializer
++   cannot be passed off as the void(void *) callback.  */
++static void
++scm_init_weak_vector_builtins_ext (void *unused)
++{
++  scm_init_weak_vector_builtins ();
++}
++
+ void
+ scm_init_weak_vectors ()
+ {
+   scm_c_register_extension ("libguile-" SCM_EFFECTIVE_VERSION,
+                             "scm_init_weak_vector_builtins",
+-                            (scm_t_extension_init_func)scm_init_weak_vector_builtins,
++                            scm_init_weak_vector_builtins_ext,
+                             NULL);
+ }
+ 
+
+--- a/module/system/base/target.scm	2024-04-15 21:58:25
++++ b/module/system/base/target.scm	2026-09-05 10:37:12
+@@ -46,14 +46,14 @@
+ 
+ ;; Hacky way to get native pointer size without having to load (system
+ ;; foreign).
+-(define-syntax %native-word-size
+-  (lambda (stx)
+-    (syntax-case stx ()
+-      (id (identifier? #'id)
+-          (cond
+-           ((< most-positive-fixnum (ash 1 32)) 4)
+-           ((< most-positive-fixnum (ash 1 64)) 8)
+-           (else (error "unexpected!" most-positive-fixnum)))))))
++;; Decided when this module runs, not when it is compiled: a cross-compiled
++;; Guile would otherwise carry the build machine's word size and its own
++;; compiler would emit bytecode it cannot load.
++(define %native-word-size
++  (cond
++   ((< most-positive-fixnum (ash 1 32)) 4)
++   ((< most-positive-fixnum (ash 1 64)) 8)
++   (else (error "unexpected!" most-positive-fixnum))))
+ 
+ (define %target-type (make-fluid %host-type))
+ (define %target-endianness (make-fluid (native-endianness)))

@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stand-in so LilyPond's configure passes: the fonts are not built here, they are taken from a
+# native LilyPond install of the same version (see build.sh, step_lilypond).
+echo "fontforge 20230101"

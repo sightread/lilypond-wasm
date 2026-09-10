@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "This is Metafont, Version 2.71828182 (stand-in; fonts come from a native LilyPond install)"

@@ -1,0 +1,15 @@
+glib decides which integer type stands behind gsize by compiling a probe with -Werror, but only
+for compilers it identifies as gcc or clang. emcc reports itself as "emscripten", so the probe
+is skipped and gsize becomes unsigned int, while wasm32's size_t is unsigned long; every
+size_t* passed to a gsize* then fails to compile. Run the probe for emcc too.
+--- a/meson.build
++++ b/meson.build
+@@ -1760,7 +1760,7 @@
+ # Do separate checks for gcc/clang (and ignore other compilers for now), since
+ # we need to explicitly pass -Werror to the compilers.
+ # FIXME: https://github.com/mesonbuild/meson/issues/5399
+-if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
++if cc.get_id() == 'gcc' or cc.get_id() == 'clang' or cc.get_id() == 'emscripten'
+   foreach type_name, size_compatibility : g_sizet_compatibility
+     g_sizet_compatibility += { type_name: size_compatibility and
+       cc.compiles(

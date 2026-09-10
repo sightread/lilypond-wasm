@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stand-in for LilyPond's configure; fonts come from a native LilyPond install (see build.sh).
+echo "t1asm 1.49"

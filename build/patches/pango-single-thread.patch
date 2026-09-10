@@ -1,0 +1,74 @@
+Pango's fontconfig font map does its FcFontSort work on a worker thread through a GAsyncQueue
+and blocks waiting for the result. This build has no threads, so that wait never returns and
+the first text layout hangs forever. Run the same task inline on the calling thread.
+--- a/pango/pangofc-fontmap.c
++++ b/pango/pangofc-fontmap.c
+@@ -1027,6 +1027,22 @@
+   return NULL;
+ }
+ 
++static void
++submit_fc_task (GAsyncQueue *queue, ThreadData *td)
++{
++#ifdef __EMSCRIPTEN__
++  switch (td->op)
++    {
++    case FC_INIT: init_in_thread (td); break;
++    case FC_MATCH: match_in_thread (td); break;
++    case FC_SORT: sort_in_thread (td); break;
++    case FC_END: thread_data_free (td); break;
++    }
++#else
++  g_async_queue_push (queue, td);
++#endif
++}
++
+ static PangoFcPatterns *
+ pango_fc_patterns_new (FcPattern *pat, PangoFcFontMap *fontmap)
+ {
+@@ -1047,7 +1063,7 @@
+   g_mutex_init (&pats->mutex);
+   g_cond_init (&pats->cond);
+ 
+-  g_async_queue_push (fontmap->priv->queue, thread_data_new (FC_MATCH, pats));
++  submit_fc_task (fontmap->priv->queue, thread_data_new (FC_MATCH, pats));
+ 
+   g_hash_table_insert (fontmap->priv->patterns_hash, pats->pattern, pats);
+ 
+@@ -1223,7 +1239,7 @@
+       before = PANGO_TRACE_CURRENT_TIME;
+ 
+       if (!pats->fontset)
+-        g_async_queue_push (pats->fontmap->priv->queue, thread_data_new (FC_SORT, pats));
++        submit_fc_task (pats->fontmap->priv->queue, thread_data_new (FC_SORT, pats));
+ 
+       g_mutex_lock (&pats->mutex);
+ 
+@@ -1524,6 +1540,10 @@
+ static void
+ start_fontconfig_thread (PangoFcFontMap *fcfontmap)
+ {
++#ifdef __EMSCRIPTEN__
++  if (fc_initialized == DEFAULT_CONFIG_NOT_INITIALIZED)
++    init_in_thread (thread_data_new (FC_INIT, NULL));
++#else
+   GThread *thread;
+ 
+   g_mutex_lock (&fc_init_mutex);
+@@ -1539,6 +1559,7 @@
+     }
+ 
+   g_mutex_unlock (&fc_init_mutex);
++#endif
+ }
+ 
+ static void
+@@ -1629,7 +1650,7 @@
+   priv->n_families = -1;
+   priv->families = NULL;
+ 
+-  g_async_queue_push (fcfontmap->priv->queue, thread_data_new (FC_END, NULL));
++  submit_fc_task (fcfontmap->priv->queue, thread_data_new (FC_END, NULL));
+ 
+   g_async_queue_unref (priv->queue);
+   priv->queue = NULL;

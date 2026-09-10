@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>LilyPond WASM Playground</title>
+  <script>
+    try {
+      const saved = localStorage.getItem('theme')
+      if (saved) document.documentElement.dataset.theme = saved
+    } catch {}
+  </script>
+  <style>
+    :root {
+      --surface: #fffcf0;
+      --surface-2: #f2f0e5;
+      --line: #e6e4d9;
+      --line-2: #cecdc3;
+      --ink: #100f0f;
+      --ink-2: #6f6e69;
+      --ink-3: #b7b5ac;
+      --accent: #5e409d;
+      --good: #66800b;
+      --wrong: #af3029;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme='light']) {
+        --surface: #100f0f;
+        --surface-2: #1c1b1a;
+        --line: #282726;
+        --line-2: #403e3c;
+        --ink: #cecdc3;
+        --ink-2: #878580;
+        --ink-3: #575653;
+        --accent: #8b7ec8;
+        --good: #879a39;
+        --wrong: #d14d41;
+      }
+    }
+    :root[data-theme='dark'] {
+      --surface: #100f0f;
+      --surface-2: #1c1b1a;
+      --line: #282726;
+      --line-2: #403e3c;
+      --ink: #cecdc3;
+      --ink-2: #878580;
+      --ink-3: #575653;
+      --accent: #8b7ec8;
+      --good: #879a39;
+      --wrong: #d14d41;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      max-width: 900px;
+      margin: 0 auto 60px;
+      padding: 0 20px;
+      font: 16px system-ui;
+      color: var(--ink);
+      background: var(--surface);
+    }
+    header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 0;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--line);
+    }
+    header .title {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-weight: 600;
+      font-size: 1.25rem;
+      letter-spacing: -0.02em;
+    }
+    header .actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    header a:hover {
+      text-decoration: underline;
+    }
+    #theme-toggle {
+      margin: 0;
+      padding: 6px 10px;
+      font-size: 1rem;
+      line-height: 1;
+    }
+    .subtitle {
+      color: var(--ink-2);
+      font-size: 0.9rem;
+      margin: 12px 0 0;
+    }
+    .secondary-link {
+      margin: 6px 0 20px;
+      font-size: 0.9rem;
+    }
+    .secondary-link a {
+      color: var(--accent);
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .secondary-link a:hover {
+      text-decoration: underline;
+    }
+    section {
+      margin: 24px 0;
+    }
+    .helper {
+      display: block;
+      margin-bottom: 8px;
+    }
+    textarea {
+      box-sizing: border-box;
+      width: 100%;
+      height: 172px;
+      padding: 14px;
+      font:
+        14px ui-monospace,
+        monospace;
+      background: var(--surface);
+      color: var(--ink);
+      border: 1px solid var(--line-2);
+      border-radius: 6px;
+    }
+    button,
+    select,
+    input[type='number'] {
+      padding: 10px 18px;
+      margin: 12px 8px 0 0;
+      font: inherit;
+      border: 1px solid var(--line-2);
+      border-radius: 6px;
+      background: var(--surface);
+      color: var(--ink);
+    }
+    button {
+      cursor: pointer;
+    }
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+    button#compile {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--surface);
+      font-weight: 600;
+    }
+    input[type='number'] {
+      width: 5em;
+      padding: 6px 8px;
+      margin: 0;
+    }
+    input[type='number']:disabled {
+      opacity: 0.5;
+    }
+    fieldset {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 16px;
+      border: 1px solid var(--line-2);
+      border-radius: 6px;
+      margin: 0;
+      padding: 8px 14px;
+    }
+    fieldset legend {
+      padding: 0 4px;
+    }
+    fieldset label {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .controls-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    .controls-row button {
+      margin: 0;
+    }
+    details > summary {
+      cursor: pointer;
+      color: var(--ink-2);
+      font-size: 0.9rem;
+    }
+    pre {
+      padding: 16px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      white-space: pre-wrap;
+      max-height: 240px;
+      overflow: auto;
+      margin-top: 10px;
+    }
+    #status {
+      color: var(--ink-2);
+      font-size: 0.9rem;
+    }
+    #status[data-state='error'] {
+      color: var(--wrong);
+    }
+    #status[data-state='success'] {
+      color: var(--good);
+    }
+    #downloads a {
+      display: inline-block;
+      margin: 0 12px 12px 0;
+    }
+    #includes {
+      margin: 10px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+    #includes li {
+      font:
+        14px ui-monospace,
+        monospace;
+    }
+    img,
+    iframe {
+      width: 100%;
+      background: white;
+      border: 0;
+    }
+    iframe {
+      height: 600px;
+    }
+    small {
+      color: var(--ink-2);
+    }
+  </style>
+  <header>
+    <span class="title">LilyPond WASM Playground</span>
+    <div class="actions">
+      <button id="theme-toggle" aria-label="Toggle color theme">🌓</button>
+      <a href="https://github.com/sightread/lilypond-wasm" target="_blank" rel="noopener"
+        >GitHub ↗</a
+      >
+      <a
+        href="https://www.npmjs.com/package/@sightread/lilypond-wasm"
+        target="_blank"
+        rel="noopener"
+        >npm ↗</a
+      >
+    </div>
+  </header>
+  <p class="subtitle">
+    Minimal browser demo for the <code>@sightread/lilypond-wasm</code> package.
+  </p>
+  <p class="secondary-link">
+    <a href="https://sightread.dev" target="_blank" rel="noopener"
+      >See LilyPond rendering in Sightread →</a
+    >
+  </p>
+  <section>
+    <label for="source">LilyPond source</label>
+    <small class="helper"
+      ><label for="file" style="text-decoration: underline; cursor: pointer">Load a .ly file</label>
+      (include files travel with it) — requires LilyPond 2.26 syntax;
+      <a href="https://lilypond.org/doc/" target="_blank" rel="noopener">convert-ly</a>
+      upgrades older <code>\version</code> scores.</small
+    >
+    <input id="file" type="file" accept=".ly,.ily" multiple hidden />
+    <textarea id="source" spellcheck="false">
+\version "2.26.0"
+\header { title = "LilyPond in WebAssembly" }
+\score {
+  \new Staff \relative c' {
+    \time 4/4 c4 d e f | g2 g | a4 a a a | g1
+  }
+  \layout { }
+  \midi { \tempo 4 = 120 }
+}</textarea>
+    <ul id="includes" aria-label="Include files"></ul>
+  </section>
+  <section>
+    <fieldset>
+      <legend>Engrave as</legend>
+      <label><input type="checkbox" name="format" value="svg" checked /> SVG</label>
+      <label><input type="checkbox" name="format" value="pdf" /> PDF</label>
+      <label
+        ><input type="checkbox" name="format" value="png" /> PNG at
+        <input
+          id="resolution"
+          type="number"
+          min="10"
+          max="1200"
+          value="101"
+          disabled
+          aria-label="PNG resolution in dots per inch"
+        />
+        dpi</label
+      >
+      <label><input type="checkbox" name="format" value="ps" /> PostScript</label>
+      <label title="Alone; one file per system"
+        ><input type="checkbox" name="format" value="eps" /> EPS</label
+      >
+      <label title="Only written if the score has a \midi block"
+        ><input type="checkbox" name="format" value="midi" checked /> MIDI</label
+      >
+    </fieldset>
+    <div class="controls-row">
+      <button id="load">Load LilyPond (~20 MB)</button>
+      <button id="compile" disabled>Compile score</button>
+      <button id="cancel" hidden>Cancel</button>
+      <span id="status" role="status"></span>
+    </div>
+  </section>
+  <div id="downloads"></div>
+  <div id="preview"></div>
+  <details>
+    <summary>Compiler log</summary>
+    <pre id="log" aria-label="Compiler log"></pre>
+  </details>
+  <script type="module" src="./demo.mjs"></script>
+</html>

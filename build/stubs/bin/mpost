@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "MetaPost 2.02 (stand-in; fonts come from a native LilyPond install)"

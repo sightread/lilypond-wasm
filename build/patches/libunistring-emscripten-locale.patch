@@ -1,0 +1,14 @@
+gnulib's getlocalename_l has no Emscripten branch. Emscripten's libc (musl) knows only the C
+locale, so every locale object's name is "C".
+--- a/lib/getlocalename_l-unsafe.c
++++ b/lib/getlocalename_l-unsafe.c
+@@ -658,6 +658,9 @@
+       };
+       const char *name = ((struct __locale_t *) locale)->mb_cur_max == 4 ? "C.UTF-8" : "C";
+       return (struct string_with_storage) { name, STORAGE_INDEFINITE };
++#elif defined __EMSCRIPTEN__
++      /* Emscripten's musl supports only the "C" locale.  */
++      return (struct string_with_storage) { "C", STORAGE_INDEFINITE };
+ #else
+  #error "Please port gnulib getlocalename_l-unsafe.c to your platform! Report this to bug-gnulib."
+ #endif

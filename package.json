@@ -1,0 +1,41 @@
+{
+  "name": "@sightread/lilypond-wasm",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Compile LilyPond scores in browsers, Node.js, and Bun with WebAssembly",
+  "author": "Jake Fried",
+  "license": "GPL-3.0-or-later AND OFL-1.1 AND (AGPL-3.0-only WITH Font-exception-2.0) AND LicenseRef-GUST-Font-License",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.d.ts",
+      "default": "./src/index.mjs"
+    },
+    "./helpers": {
+      "types": "./src/helpers.d.ts",
+      "default": "./src/helpers.mjs"
+    }
+  },
+  "files": [
+    "DEVELOPMENT.md",
+    "src",
+    "helpers",
+    "build",
+    "licenses",
+    "dist",
+    "LICENSE"
+  ],
+  "scripts": {
+    "benchmark": "bun benchmarks/compile.ts",
+    "demo": "bun build/site.mjs --serve",
+    "fetch-dist": "bun build/fetch-dist.mjs",
+    "fetch-sources": "bun build/fetch-sources.mjs",
+    "prepack": "bun build/verify-package.mjs",
+    "site": "bun build/site.mjs",
+    "test": "bun test",
+    "test:parity": "bun test/parity.mjs"
+  },
+  "repository": "github:sightread/lilypond-wasm"
+}
