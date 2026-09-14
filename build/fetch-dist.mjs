@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 
 export const OWNER = 'sightread'
 export const REPO = 'lilypond-wasm'
-export const RELEASE = 'v0.1.0'
+export const RELEASE = 'v0.1.1'
 export const FILES = {
   'lilypond.mjs': ['3fe115d72d1a3b3e345c457e46356646ef131f9adbfeec1d007da05294ec5388', 189241],
   'lilypond.wasm': ['f267b45340454f472ee6c8a6b0e1b27ee53ce75b8326c0bda6c7ff3e55965137', 15266329],

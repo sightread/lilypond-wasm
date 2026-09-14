@@ -149,3 +149,28 @@ test('live Scheme objects survive repeated GC and a 1024-note score', async () =
   )
   assert.ok(stress.files['score.midi'].length > 5000)
 })
+
+test('an idle compiler does not hold the runtime open', async () => {
+  // The worker is a live thread. Left referenced, it keeps the event loop alive, so a CLI that
+  // compiles a score and then falls off the end of main hangs forever instead of exiting -- the
+  // caller's missing dispose() costing a wedged process rather than a leaked thread. Compiling
+  // and simply returning has to be enough, so this runs a real program that does exactly that.
+  const program = `
+    import { createReusableCompiler } from ${JSON.stringify(new URL('../src/index.mjs', import.meta.url).href)}
+    const compiler = createReusableCompiler()
+    const result = await compiler.compile(${JSON.stringify(source)}, { format: 'midi' })
+    if (!result.files['score.midi']) throw new Error('no midi')
+    console.log('compiled')
+  `
+  const child = Bun.spawn(['bun', '-e', program], { stdout: 'pipe', stderr: 'pipe' })
+  const exited = await Promise.race([
+    child.exited,
+    new Promise((resolve) => setTimeout(() => resolve('timeout'), 120_000)),
+  ])
+  if (exited === 'timeout') {
+    child.kill()
+    throw new Error('compiler kept the process alive after its last compile')
+  }
+  assert.equal(await new Response(child.stdout).text(), 'compiled\n')
+  assert.equal(exited, 0)
+}, 130_000)

@@ -21,13 +21,20 @@ function abortError(signal) {
  * Node gets node:worker_threads. Both are real threads that can be terminated mid-compile,
  * so `signal` and `dispose()` mean the same thing everywhere — a compile in progress is a
  * long synchronous run inside WebAssembly, and killing the thread is the only way to stop it.
+ *
+ * The worker is referenced only while a compile is in flight. Idle, it must not hold the
+ * runtime open, or a CLI that compiles a score and returns from main would hang instead of
+ * exiting.
  */
 async function spawnWorker() {
   if (typeof Worker === 'function') {
     const worker = new Worker(new URL('./worker.mjs', import.meta.url), { type: 'module' })
+    worker.unref?.()
     return {
       post: (message) => worker.postMessage(message),
       terminate: () => worker.terminate(),
+      ref: () => worker.ref?.(),
+      unref: () => worker.unref?.(),
       listen: (onMessage, onError) => {
         worker.onmessage = ({ data }) => onMessage(data)
         worker.onerror = (event) => onError(new Error(event.message || 'LilyPond worker failed'))
@@ -47,6 +54,8 @@ async function spawnWorker() {
   return {
     post: (message) => worker.postMessage(message),
     terminate: () => void worker.terminate(),
+    ref: () => worker.ref(),
+    unref: () => worker.unref(),
     listen: (onMessage, onError) => {
       handlers = { onMessage, onError }
     },
@@ -79,6 +88,7 @@ function createCompiler() {
     return new Promise((resolve, reject) => {
       const settle = (fn) => (value) => {
         instance.silence()
+        instance.unref()
         activeReject = undefined
         signal?.removeEventListener('abort', onAbort)
         fn(value)
@@ -102,6 +112,7 @@ function createCompiler() {
         },
         (error) => terminate(error),
       )
+      instance.ref()
       instance.post({ source, ...options })
     })
   }
