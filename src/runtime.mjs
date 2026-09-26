@@ -3,9 +3,15 @@ const decoder = new TextDecoder()
 const MISSING_DIST =
   'the lilypond-wasm engine is missing from dist/; run `bun run fetch-dist` in the package'
 
+const DIST_URLS = {
+  'lilypond.mjs': new URL('../dist/lilypond.mjs', import.meta.url),
+  'lilypond.wasm': new URL('../dist/lilypond.wasm', import.meta.url),
+  'runtime.data.bin': new URL('../dist/runtime.data.bin', import.meta.url),
+}
+
 /** dist/ is fetched, not committed, so both of its entry points fail the same helpful way. */
 async function distUrl(name) {
-  const url = new URL(`../dist/${name}`, import.meta.url)
+  const url = DIST_URLS[name]
   if (url.protocol !== 'file:') return url
   const { access } = await import('node:fs/promises')
   try {
@@ -145,7 +151,9 @@ export async function compile(
   }
   let exitCode = 0
   const createLilyPond = await loadEngine()
+  const wasmUrl = await distUrl('lilypond.wasm')
   const mod = await createLilyPond({
+    locateFile: (name) => (name === 'lilypond.wasm' ? wasmUrl.href : name),
     print: log,
     printErr: log,
     onExit: (code) => {
