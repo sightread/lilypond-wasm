@@ -4,6 +4,8 @@ export type RuntimeAssets = readonly (readonly [path: string, bytes: Uint8Array]
 export interface CompileOptions {
   /** From `loadRuntime`; load once and reuse across compiles. */
   readonly assets?: RuntimeAssets
+  /** From `loadWasm`; compile once and reuse across compiles. */
+  readonly wasmModule?: WebAssembly.Module
   /** Extra files visible to `\include`, keyed by relative path. */
   readonly files?: Readonly<Record<string, Uint8Array | string>>
   /** Virtual directories from `files` to search for `\include` files, in order. */
@@ -28,5 +30,14 @@ export interface CompileResult {
   readonly files: Readonly<Record<string, Uint8Array>>
 }
 
-export function loadRuntime(bytes?: ArrayBuffer | Uint8Array): Promise<RuntimeAssets>
+/** Callback for creating progress bars */
+export type DownloadProgressCallback = (loadedBytes: number, totalBytes: number) => void
+
+export function loadRuntime(
+  bytes?: ArrayBuffer | Uint8Array,
+  options?: { readonly onProgress?: DownloadProgressCallback },
+): Promise<RuntimeAssets>
+export function loadWasm(options?: {
+  readonly onProgress?: DownloadProgressCallback
+}): Promise<WebAssembly.Module>
 export function compile(source: string, options?: CompileOptions): Promise<CompileResult>

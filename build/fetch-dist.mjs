@@ -10,18 +10,12 @@ import { createHash } from 'node:crypto'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { DIST_FILES } from '../src/dist-files.mjs'
 
 export const OWNER = 'sightread'
 export const REPO = 'lilypond-wasm'
 export const RELEASE = 'v0.1.1'
-export const FILES = {
-  'lilypond.mjs': ['3fe115d72d1a3b3e345c457e46356646ef131f9adbfeec1d007da05294ec5388', 189241],
-  'lilypond.wasm': ['f267b45340454f472ee6c8a6b0e1b27ee53ce75b8326c0bda6c7ff3e55965137', 15266329],
-  'runtime.data.bin': [
-    '2c823124d890f51b3bff3a617d609aa31c71ce26341cc18558fd10c91dd81117',
-    15914502,
-  ],
-}
+export const FILES = DIST_FILES
 export const DIST_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'dist')
 
 export const FETCH_HINT = `run \`bun run fetch-dist\` in ${REPO} to download the pinned engine`

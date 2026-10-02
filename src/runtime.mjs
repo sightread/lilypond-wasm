@@ -1,3 +1,5 @@
+import { DIST_FILES } from './dist-files.mjs'
+
 const decoder = new TextDecoder()
 
 const MISSING_DIST =
@@ -29,21 +31,51 @@ function loadEngine() {
   ))
 }
 
+/**
+ * Given a filename, return the bytes for that dist file.
+ * Pass an onProgress callback if interested in download progress.
+ */
+async function readDist(name, onProgress = () => {}) {
+  const url = await distUrl(name)
+  const pinnedBytes = DIST_FILES[name][1]
+  if (url.protocol === 'file:') {
+    // Node and Bun: fetch() refuses file: URLs, and this is a local read anyway.
+    const { readFile } = await import('node:fs/promises')
+    const bytes = await readFile(url)
+    onProgress(bytes.length, bytes.length)
+    return bytes
+  }
+  const response = await fetch(url)
+  if (!response.ok) throw new Error(`${name} download failed: ${response.status}`)
+  const chunks = []
+  let loadedBytes = 0
+  onProgress(0, pinnedBytes)
+  // getReader, not `for await`: Safari before 18.4 cannot iterate a ReadableStream.
+  const reader = response.body.getReader()
+  for (let read = await reader.read(); !read.done; read = await reader.read()) {
+    chunks.push(read.value)
+    loadedBytes += read.value.length
+    onProgress(loadedBytes, Math.max(pinnedBytes, loadedBytes))
+  }
+  const bytes = new Uint8Array(loadedBytes)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.length
+  }
+  return bytes
+}
+
+/** The compiled engine. Compile once and pass it to every `compile` as `wasmModule`, so each
+ *  fresh engine instance skips downloading and compiling 15 MB of WebAssembly. */
+export async function loadWasm({ onProgress } = {}) {
+  return WebAssembly.compile(await readDist('lilypond.wasm', onProgress))
+}
+
 /** Unpack the runtime data into the assets `compile` installs. Load once and reuse across
  *  fresh engine instances; every compile needs a fresh engine but not fresh assets. */
-export async function loadRuntime(bytes) {
-  if (!bytes) {
-    const url = await distUrl('runtime.data.bin')
-    if (url.protocol === 'file:') {
-      // Node and Bun: fetch() refuses file: URLs, and this is a local read anyway.
-      const { readFile } = await import('node:fs/promises')
-      bytes = await readFile(url)
-    } else {
-      const response = await fetch(url)
-      if (!response.ok) throw new Error(`Runtime download failed: ${response.status}`)
-      bytes = await response.arrayBuffer()
-    }
-  }
+export async function loadRuntime(bytes, { onProgress } = {}) {
+  bytes ??= await readDist('runtime.data.bin', onProgress)
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
   const buffer = await new Response(stream).arrayBuffer()
   const length = new DataView(buffer).getUint32(0, true)
@@ -119,7 +151,7 @@ function outputArgs(format, resolution) {
  * Run one score in a fresh in-memory filesystem holding nothing but the runtime assets, the
  * caller's `files` and the source. Returns exitCode, logs, and the output files as Uint8Arrays.
  * The engine is rebuilt per call because LilyPond exits and frees its global state once it has
- * processed its input; only `assets` survives between calls.
+ * processed its input; only `assets` and `wasmModule` survive between calls.
  *
  * This is the low-level entry point and it runs on whatever thread calls it. Use index.mjs,
  * which drives it from a worker.
@@ -128,6 +160,7 @@ export async function compile(
   source,
   {
     assets,
+    wasmModule,
     files = {},
     filename = 'score.ly',
     includePaths = [],
@@ -151,9 +184,12 @@ export async function compile(
   }
   let exitCode = 0
   const createLilyPond = await loadEngine()
-  const wasmUrl = await distUrl('lilypond.wasm')
+  wasmModule ??= await loadWasm()
   const mod = await createLilyPond({
-    locateFile: (name) => (name === 'lilypond.wasm' ? wasmUrl.href : name),
+    instantiateWasm: (imports, receive) => {
+      WebAssembly.instantiate(wasmModule, imports).then(receive)
+      return {}
+    },
     print: log,
     printErr: log,
     onExit: (code) => {

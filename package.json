@@ -1,6 +1,6 @@
 {
   "name": "@sightread/lilypond-wasm",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "type": "module",
   "description": "Compile LilyPond scores in browsers, Node.js, and Bun with WebAssembly",
   "author": "Jake Fried",

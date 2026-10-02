@@ -26,4 +26,5 @@ The last two steps (`data`, `notices`) copy LilyPond's data directory and regene
 # Releasing
 
 Attach `dist/lilypond.mjs`, `dist/lilypond.wasm` and `dist/runtime.data.bin` to a GitHub
-release, then update `RELEASE` and the hashes in `build/fetch-dist.mjs` to match.
+release, then update `RELEASE` in `build/fetch-dist.mjs` and the hashes and sizes in
+`src/dist-files.mjs` to match.

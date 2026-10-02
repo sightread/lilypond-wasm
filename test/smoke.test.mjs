@@ -174,3 +174,23 @@ test('an idle compiler does not hold the runtime open', async () => {
   assert.equal(await new Response(child.stdout).text(), 'compiled\n')
   assert.equal(exited, 0)
 }, 130_000)
+
+test('preload resolves, and a compile after it reuses the loaded engine', async () => {
+  const fresh = createReusableCompiler()
+  try {
+    const reports = []
+    await fresh.preload({ onProgress: (progress) => reports.push(progress) })
+    const total = reports[0]?.totalBytes
+    assert.ok(total > 0)
+    assert.ok(reports.every((report) => report.totalBytes === total))
+    assert.equal(reports.at(-1).loadedBytes, total)
+
+    const later = []
+    await fresh.preload({ onProgress: (progress) => later.push(progress) })
+    assert.deepEqual(later, [])
+    const result = await fresh.compile(source, { format: 'midi' })
+    assert.equal(decode(result.files['score.midi'].subarray(0, 4)), 'MThd')
+  } finally {
+    fresh.dispose()
+  }
+}, 60_000)

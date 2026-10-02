@@ -78,7 +78,7 @@ function createCompiler() {
     activeReject = undefined
   }
 
-  const run = async (source, { signal, onLog, ...options }) => {
+  const run = async (message, { signal, onLog, onProgress }) => {
     if (disposed) throw new Error('Compiler has been disposed')
     if (signal?.aborted) throw abortError(signal)
     const instance = (worker ??= await spawnWorker())
@@ -101,7 +101,10 @@ function createCompiler() {
       instance.listen(
         (data) => {
           if (data.type === 'log') onLog?.(data.text)
+          else if (data.type === 'progress')
+            onProgress?.({ loadedBytes: data.loadedBytes, totalBytes: data.totalBytes })
           else if (data.type === 'error') fail(new Error(data.message))
+          else if (data.type === 'ready') done(undefined)
           else {
             try {
               done(succeeded(data))
@@ -113,18 +116,25 @@ function createCompiler() {
         (error) => terminate(error),
       )
       instance.ref()
-      instance.post({ source, ...options })
+      instance.post(message)
     })
   }
 
+  const enqueue = (message, handlers) => {
+    const job = queue.then(() => run(message, handlers))
+    queue = job.then(
+      () => undefined,
+      () => undefined,
+    )
+    return job
+  }
+
   return {
-    compile(source, options = {}) {
-      const job = queue.then(() => run(source, options))
-      queue = job.then(
-        () => undefined,
-        () => undefined,
-      )
-      return job
+    compile(source, { signal, onLog, ...options } = {}) {
+      return enqueue({ source, ...options }, { signal, onLog })
+    },
+    preload({ signal, onProgress } = {}) {
+      return enqueue({ type: 'preload' }, { signal, onProgress })
     },
     dispose() {
       disposed = true

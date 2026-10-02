@@ -35,6 +35,18 @@ If foregoing a bundler, serve the package's `src/` and `dist/` directories toget
 relative layout. Import `src/index.mjs` by URL, and it should be able to find
 its other required files via relative imports.
 
+The engine is about 30 MB to download. To start it early and show progress, call `preload` on a
+reusable compiler:
+
+```js
+import { createReusableCompiler } from '@sightread/lilypond-wasm'
+
+const compiler = createReusableCompiler()
+await compiler.preload({
+  onProgress: ({ loadedBytes, totalBytes }) => console.log(`${loadedBytes} / ${totalBytes}`),
+})
+```
+
 ## Batch compilation
 
 If compiling a batch, then you can reduce some of the cost by making a reusable compiler.
